@@ -4,414 +4,171 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema; // Add this
 
 class CategoryController extends Controller
 {
     /**
-     * Display a listing of categories.
+     * Display a listing of the categories.
      */
-    public function index(Request $request)
+    public function index()
     {
-        try {
-            // You can add pagination, search, and filtering
-            $query = Category::query();
+        $categories = Category::when(method_exists(Category::class, 'courses'), function($query) {
+                $query->withCount('courses');
+            })
+            ->when(request('search'), function ($query) {
+                $query->where('name', 'like', '%' . request('search') . '%')
+                      ->orWhere('description', 'like', '%' . request('search') . '%');
+            })
+            ->orderBy('name')
+            ->paginate(10);
 
-            // Search functionality
-            if ($request->has('search') && !empty($request->search)) {
-                $searchTerm = $request->search;
-                $query->where(function ($q) use ($searchTerm) {
-                    $q->where('name', 'like', '%' . $searchTerm . '%')
-                      ->orWhere('slug', 'like', '%' . $searchTerm . '%');
-                });
-            }
-
-            // Filter by courses existence
-            if ($request->has('has_courses') && $request->has_courses) {
-                $query->hasCourses();
-            }
-
-            // Filter by published courses existence
-            if ($request->has('has_published_courses') && $request->has_published_courses) {
-                $query->hasPublishedCourses();
-            }
-
-            // Ordering
-            $orderBy = $request->get('order_by', 'name');
-            $orderDirection = $request->get('order_direction', 'asc');
-            
-            if (in_array($orderBy, ['name', 'slug', 'created_at', 'updated_at'])) {
-                $query->orderBy($orderBy, $orderDirection);
-            }
-
-            // Get categories with courses count (if needed)
-            $withCounts = $request->get('with_counts', false);
-            if ($withCounts) {
-                $query->withCount(['courses', 'publishedCourses']);
-            }
-
-            // Pagination or all
-            $perPage = $request->get('per_page', 15);
-            $categories = $perPage === 'all' 
-                ? $query->get()
-                : $query->paginate($perPage);
-
-            return response()->json([
-                'success' => true,
-                'data' => $categories,
-                'message' => 'Categories retrieved successfully.'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Category index error: ' . $e->getMessage());
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve categories.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+        // Calculate statistics
+        $categoriesWithCourses = 0;
+        $emptyCategories = 0;
+        if (method_exists(Category::class, 'courses')) {
+            $categoriesWithCourses = Category::has('courses')->count();
+            $emptyCategories = Category::doesntHave('courses')->count();
         }
+
+        return view('categories.index', compact('categories', 'categoriesWithCourses', 'emptyCategories'));
     }
 
     /**
-     * Store a newly created category.
+     * Show the form for creating a new category.
+     */
+    public function create()
+    {
+        return view('categories.create');
+    }
+
+    /**
+     * Store a newly created category in storage.
      */
     public function store(Request $request)
     {
-        DB::beginTransaction();
+        // Basic validation
+        $request->validate([
+            'name' => 'required|string|max:255|unique:categories,name',
+        ]);
 
-        try {
-            $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255|unique:categories,name',
-                'slug' => 'nullable|string|max:255|unique:categories,slug|regex:/^[a-z0-9-]+$/',
-            ], [
-                'slug.regex' => 'Slug can only contain lowercase letters, numbers, and hyphens.',
-            ]);
+        // Prepare data with only existing columns
+        $categoryData = [
+            'name' => $request->name,
+            'slug' => Str::slug($request->name),
+        ];
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $category = Category::create([
-                'name' => $request->name,
-                'slug' => $request->slug, // If null, will be auto-generated by model boot
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'data' => $category,
-                'message' => 'Category created successfully.'
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Category store error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create category.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+        // Only add description if column exists
+        if (Schema::hasColumn('categories', 'description')) {
+            $request->validate(['description' => 'nullable|string']);
+            $categoryData['description'] = $request->description;
         }
+
+        // Only add icon if column exists
+        if (Schema::hasColumn('categories', 'icon')) {
+            $request->validate(['icon' => 'nullable|string']);
+            $categoryData['icon'] = $request->icon;
+        }
+
+        // Only add color if column exists
+        if (Schema::hasColumn('categories', 'color')) {
+            $request->validate(['color' => 'nullable|string|max:7']);
+            $categoryData['color'] = $request->color;
+        }
+
+        Category::create($categoryData);
+
+        return redirect()->route('categories.index')->with('success', 'Category created successfully!');
     }
 
     /**
      * Display the specified category.
      */
-    public function show($slug)
+    public function show(string $id)
     {
-        try {
-            // Using slug for route model binding (as defined in getRouteKeyName())
-            $category = Category::where('slug', $slug)
-                ->withCount(['courses', 'publishedCourses'])
-                ->firstOrFail();
-
-            // Load courses if requested
-            if (request()->has('with_courses')) {
-                $category->load(['courses' => function ($query) {
-                    if (request()->has('published_only')) {
-                        $query->where('published', true);
-                    }
-                    
-                    // Order courses if needed
-                    $query->orderBy(request()->get('courses_order_by', 'title'))
-                          ->orderBy(request()->get('courses_order_direction', 'asc'));
-                }]);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $category,
-                'message' => 'Category retrieved successfully.'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Category show error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Category not found.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 404);
+        $category = Category::findOrFail($id);
+        
+        // Add courses count if relationship exists
+        if (method_exists($category, 'courses')) {
+            $category->loadCount('courses');
         }
+        
+        return view('categories.show', compact('category'));
     }
 
     /**
-     * Update the specified category.
+     * Show the form for editing the specified category.
      */
-    public function update(Request $request, $slug)
+    public function edit($id)
     {
-        DB::beginTransaction();
-
-        try {
-            $category = Category::where('slug', $slug)->firstOrFail();
-
-            $validator = Validator::make($request->all(), [
-                'name' => [
-                    'required',
-                    'string',
-                    'max:255',
-                    Rule::unique('categories', 'name')->ignore($category->id),
-                ],
-                'slug' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                    'regex:/^[a-z0-9-]+$/',
-                    Rule::unique('categories', 'slug')->ignore($category->id),
-                ],
-            ], [
-                'slug.regex' => 'Slug can only contain lowercase letters, numbers, and hyphens.',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // Update category
-            $category->update([
-                'name' => $request->name,
-                'slug' => $request->slug, // If null, model boot will handle it based on name change
-            ]);
-
-            DB::commit();
-
-            // Refresh to get updated attributes
-            $category->refresh();
-
-            return response()->json([
-                'success' => true,
-                'data' => $category,
-                'message' => 'Category updated successfully.'
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Category update error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update category.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+        $category = Category::findOrFail($id);
+        
+        // Add courses count if relationship exists
+        if (method_exists($category, 'courses')) {
+            $category->loadCount('courses');
         }
+        
+        return view('categories.edit', compact('category'));
     }
 
     /**
-     * Remove the specified category.
+     * Update the specified category in storage.
      */
-    public function destroy($slug)
+    public function update(Request $request, $id)
     {
-        DB::beginTransaction();
+        $category = Category::findOrFail($id);
+        
+        // Basic validation
+        $request->validate([
+            'name' => 'required|string|max:255|unique:categories,name,' . $id,
+            'slug' => 'required|string|max:255|unique:categories,slug,' . $id,
+        ]);
 
-        try {
-            $category = Category::where('slug', $slug)->firstOrFail();
+        // Prepare update data with only existing columns
+        $updateData = [
+            'name' => $request->name,
+            'slug' => $request->slug,
+        ];
 
-            // Check if category has courses before deletion
-            if (request()->has('force') && request()->force) {
-                // Force delete even with courses (be careful with this!)
-                $category->delete();
-            } else {
-                // Check for courses first
-                if ($category->hasCourses()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Cannot delete category because it has associated courses. Use force option to delete anyway.',
-                        'courses_count' => $category->courses_count
-                    ], 422);
-                }
-                
-                $category->delete();
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Category deleted successfully.'
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Category destroy error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete category.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+        // Only update description if column exists
+        if (Schema::hasColumn('categories', 'description')) {
+            $request->validate(['description' => 'nullable|string']);
+            $updateData['description'] = $request->description;
         }
+
+        // Only update icon if column exists
+        if (Schema::hasColumn('categories', 'icon')) {
+            $request->validate(['icon' => 'nullable|string']);
+            $updateData['icon'] = $request->icon;
+        }
+
+        // Only update color if column exists
+        if (Schema::hasColumn('categories', 'color')) {
+            $request->validate(['color' => 'nullable|string|max:7']);
+            $updateData['color'] = $request->color;
+        }
+
+        $category->update($updateData);
+
+        return redirect()->route('categories.index')->with('success', 'Category updated successfully!');
     }
 
     /**
-     * Get categories for dropdown/select options.
+     * Remove the specified category from storage.
      */
-    public function dropdown()
+    public function destroy(string $id)
     {
-        try {
-            $categories = Category::select('id', 'name', 'slug')
-                ->orderBy('name')
-                ->get()
-                ->map(function ($category) {
-                    return [
-                        'id' => $category->id,
-                        'name' => $category->display_name, // Using accessor
-                        'slug' => $category->slug,
-                    ];
-                });
-
-            return response()->json([
-                'success' => true,
-                'data' => $categories,
-                'message' => 'Categories dropdown retrieved successfully.'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Category dropdown error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve categories dropdown.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+        $category = Category::findOrFail($id);
+        
+        // Check if category has courses before deleting (if relationship exists)
+        if (method_exists($category, 'courses') && $category->courses()->count() > 0) {
+            return redirect()->route('categories.index')
+                ->with('error', 'Cannot delete category that has courses. Please remove or reassign courses first.');
         }
-    }
+        
+        $category->delete();
 
-    /**
-     * Get statistics about categories.
-     */
-    public function statistics()
-    {
-        try {
-            $totalCategories = Category::count();
-            $categoriesWithCourses = Category::hasCourses()->count();
-            $categoriesWithPublishedCourses = Category::hasPublishedCourses()->count();
-
-            // Top categories by course count
-            $topCategories = Category::withCount(['courses', 'publishedCourses'])
-                ->hasCourses()
-                ->orderBy('courses_count', 'desc')
-                ->limit(10)
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'total_categories' => $totalCategories,
-                    'categories_with_courses' => $categoriesWithCourses,
-                    'categories_with_published_courses' => $categoriesWithPublishedCourses,
-                    'top_categories' => $topCategories,
-                ],
-                'message' => 'Category statistics retrieved successfully.'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Category statistics error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve category statistics.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
-    }
-
-    /**
-     * Bulk delete categories.
-     */
-    public function bulkDestroy(Request $request)
-    {
-        DB::beginTransaction();
-
-        try {
-            $validator = Validator::make($request->all(), [
-                'ids' => 'required|array',
-                'ids.*' => 'exists:categories,id',
-                'force' => 'boolean',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $categories = Category::whereIn('id', $request->ids)->get();
-            $deletedCount = 0;
-            $failedCount = 0;
-            $errors = [];
-
-            foreach ($categories as $category) {
-                try {
-                    if ($request->force || !$category->hasCourses()) {
-                        $category->delete();
-                        $deletedCount++;
-                    } else {
-                        $failedCount++;
-                        $errors[] = "Category '{$category->name}' has courses and cannot be deleted.";
-                    }
-                } catch (\Exception $e) {
-                    $failedCount++;
-                    $errors[] = "Failed to delete category '{$category->name}': " . $e->getMessage();
-                }
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Bulk delete completed.',
-                'data' => [
-                    'deleted_count' => $deletedCount,
-                    'failed_count' => $failedCount,
-                    'errors' => $errors,
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Category bulk destroy error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to perform bulk delete.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
+        return redirect()->route('categories.index')->with('success', 'Category deleted successfully.');
     }
 }
