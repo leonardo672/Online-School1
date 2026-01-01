@@ -277,7 +277,7 @@ function printCourseDetails() {
                     </tr>
                     <tr>
                         <td><strong>Price:</strong></td>
-                        <td>{{ $course->price == 0 ? 'Free' : '$' + {{ $course->price }} }}</td>
+                        <td>{{ $course->price == 0 ? 'Free' : '$' . number_format($course->price, 2) }}</td>
                     </tr>
                     <tr>
                         <td><strong>Level:</strong></td>
