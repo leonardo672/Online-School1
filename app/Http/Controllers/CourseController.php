@@ -15,8 +15,29 @@ class CourseController extends Controller
      */
     public function index()
     {
-        $courses = Course::all(); // Fetch all courses
-        return view('courses.index', compact('courses')); // Pass courses data to the view
+        $courses = Course::with(['category', 'instructor'])
+            ->when(request('search'), function ($query) {
+                $query->where('title', 'like', '%' . request('search') . '%')
+                    ->orWhere('description', 'like', '%' . request('search') . '%');
+            })
+            ->when(request('category'), function ($query) {
+                $query->whereHas('category', function ($q) {
+                    $q->where('slug', request('category'));
+                });
+            })
+            ->when(request('level'), function ($query) {
+                $query->where('level', request('level'));
+            })
+            ->latest()
+            ->paginate(10); // Changed from all() to paginate(10)
+
+        // Calculate statistics
+        $totalCourses = Course::count();
+        $publishedCount = Course::where('published', true)->count();
+        $draftCount = Course::where('published', false)->count();
+        $freeCount = Course::where('price', 0)->count();
+
+        return view('courses.index', compact('courses', 'totalCourses', 'publishedCount', 'draftCount', 'freeCount'));
     }
 
     /**
