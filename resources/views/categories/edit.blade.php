@@ -7,7 +7,7 @@
       <h4 class="card-title mb-0">
         <i class="fas fa-edit"></i> Edit Category: {{ $category->name }}
       </h4>
-      <a href="{{ url('categories/' . $category->id) }}" class="btn btn-view">
+      <a href="{{ url('categories/' . $category->slug) }}" class="btn btn-view">
         <i class="fas fa-eye"></i> View
       </a>
     </div>
@@ -15,11 +15,10 @@
   
   <div class="card-body">
     
-    <!-- Display validation errors -->
     @if ($errors->any())
       <div class="alert alert-danger alert-school">
-          <strong>Whoops!</strong> There were some problems with your input.<br><br>
-          <ul>
+          <strong>Whoops!</strong> There were some problems with your input.
+          <ul class="mb-0 mt-2">
               @foreach ($errors->all() as $error)
                   <li>{{ $error }}</li>
               @endforeach
@@ -27,236 +26,85 @@
       </div>
     @endif
 
-    <form action="{{ url('categories/' . $category->id) }}" method="post">
+    <form action="{{ url('categories/' . $category->slug) }}" method="POST">
       @csrf
       @method("PATCH")
-      <input type="hidden" name="id" id="id" value="{{ $category->id }}" />
-      
+
       <div class="row">
         <div class="col-md-8 mb-3">
-          <label for="name" class="form-label">Category Name *</label>
-          <input type="text" name="name" id="name" class="form-control" 
-                 value="{{ old('name', $category->name) }}" required placeholder="Enter category name">
-          <div class="form-text">Choose a clear and descriptive name for the category</div>
+          <label class="form-label">Category Name *</label>
+          <input type="text" name="name" class="form-control"
+                 value="{{ old('name', $category->name) }}" required>
         </div>
 
         <div class="col-md-4 mb-3">
-          <label for="slug" class="form-label">Slug *</label>
-          <input type="text" name="slug" id="slug" class="form-control" 
+          <label class="form-label">Slug *</label>
+          <input type="text" name="slug" class="form-control"
                  value="{{ old('slug', $category->slug) }}" required>
-          <div class="form-text">URL-friendly version of the name</div>
         </div>
       </div>
 
       <div class="mb-3">
-        <label for="description" class="form-label">Category Description</label>
-        <textarea name="description" id="description" class="form-control" 
-                  rows="4" placeholder="Briefly describe what this category includes">{{ old('description', $category->description) }}</textarea>
-        <div class="form-text">Optional: Add a description to help organize courses</div>
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-control" rows="4">{{ old('description', $category->description) }}</textarea>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Category Icon</label>
-        <div class="row">
-          <div class="col-md-6">
-            <select name="icon" id="icon" class="form-select">
-              <option value="">Select an icon</option>
-              <option value="fas fa-code" {{ (old('icon', $category->icon) == 'fas fa-code') ? 'selected' : '' }}>💻 Programming</option>
-              <option value="fas fa-chart-bar" {{ (old('icon', $category->icon) == 'fas fa-chart-bar') ? 'selected' : '' }}>📊 Data Science</option>
-              <option value="fas fa-paint-brush" {{ (old('icon', $category->icon) == 'fas fa-paint-brush') ? 'selected' : '' }}>🎨 Design</option>
-              <option value="fas fa-briefcase" {{ (old('icon', $category->icon) == 'fas fa-briefcase') ? 'selected' : '' }}>💼 Business</option>
-              <option value="fas fa-music" {{ (old('icon', $category->icon) == 'fas fa-music') ? 'selected' : '' }}>🎵 Music</option>
-              <option value="fas fa-language" {{ (old('icon', $category->icon) == 'fas fa-language') ? 'selected' : '' }}>🌐 Languages</option>
-              <option value="fas fa-heartbeat" {{ (old('icon', $category->icon) == 'fas fa-heartbeat') ? 'selected' : '' }}>❤️ Health</option>
-              <option value="fas fa-camera" {{ (old('icon', $category->icon) == 'fas fa-camera') ? 'selected' : '' }}>📸 Photography</option>
-            </select>
-          </div>
-            <div class="col-md-6">
-                <div class="icon-preview p-3 text-center" id="iconPreview">
-                    @if($category->icon)
-                        <i class="{{ $category->icon }} fa-2x" @if($category->color) style="color: {{ $category->color }};" @endif></i>
-                    @else
-                    <i class="fas fa-folder fa-2x text-muted"></i>
-                    @endif
-                    <p class="small mt-2">Icon Preview</p>
-                </div>
-            </div>
-        </div>
-        <div class="form-text">Choose an icon to represent this category visually</div>
+        <label class="form-label">Icon</label>
+        <select name="icon" class="form-select">
+          <option value="">None</option>
+          <option value="fas fa-code" {{ old('icon',$category->icon)=='fas fa-code'?'selected':'' }}>Programming</option>
+          <option value="fas fa-chart-bar" {{ old('icon',$category->icon)=='fas fa-chart-bar'?'selected':'' }}>Data</option>
+          <option value="fas fa-paint-brush" {{ old('icon',$category->icon)=='fas fa-paint-brush'?'selected':'' }}>Design</option>
+          <option value="fas fa-language" {{ old('icon',$category->icon)=='fas fa-language'?'selected':'' }}>Languages</option>
+        </select>
       </div>
 
       <div class="mb-3">
-        <label for="color" class="form-label">Category Color</label>
-        <div class="input-group">
-          <input type="color" name="color" id="color" class="form-control form-control-color" 
-                 value="{{ old('color', $category->color ?: '#3498db') }}" title="Choose a color for this category">
-          <input type="text" id="colorText" class="form-control" 
-                 value="{{ old('color', $category->color ?: '#3498db') }}" placeholder="#3498db">
-        </div>
-        <div class="form-text">Select a color to distinguish this category</div>
+        <label class="form-label">Color</label>
+        <input type="color" name="color" class="form-control form-control-color"
+               value="{{ old('color', $category->color ?? '#3498db') }}">
       </div>
 
       <div class="d-flex justify-content-between">
         <a href="{{ url('categories') }}" class="btn btn-secondary">
-          <i class="fas fa-arrow-left"></i> Back to Categories
+          <i class="fas fa-arrow-left"></i> Back
         </a>
-        <div>
-          <button type="reset" class="btn btn-outline-secondary me-2">
-            <i class="fas fa-redo"></i> Reset
-          </button>
-          <button type="submit" class="btn btn-custom">
-            <i class="fas fa-save"></i> Update Category
-          </button>
-        </div>
+        <button type="submit" class="btn btn-custom">
+          <i class="fas fa-save"></i> Update Category
+        </button>
       </div>
     </form>
-   
   </div>
 </div>
 
-<!-- Category Statistics Card -->
+{{-- Courses --}}
+@if($category->courses()->count())
 <div class="card mt-4">
   <div class="card-header">
-    <h5 class="card-title mb-0">
-      <i class="fas fa-chart-pie"></i> Category Statistics
-    </h5>
+    <h5><i class="fas fa-graduation-cap"></i> Courses in this category</h5>
   </div>
   <div class="card-body">
-    <div class="row text-center">
-      <div class="col-md-3 mb-3">
-        <div class="stat-card p-3 rounded">
-          <h6 class="text-muted">Total Courses</h6>
-          <h3 class="text-primary">
-            @php
-                // Safely get course count
-                $totalCourses = 0;
-                if (method_exists($category, 'courses')) {
-                    $totalCourses = $category->courses()->count();
-                }
-            @endphp
-            {{ $totalCourses }}
-          </h3>
-          <small>Courses in this category</small>
-        </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="stat-card p-3 rounded">
-          <h6 class="text-muted">Published</h6>
-          <h3 class="text-success">
-            @php
-                // Safely get published courses count
-                $publishedCourses = 0;
-                if (method_exists($category, 'courses')) {
-                    $publishedCourses = $category->courses()->where('published', true)->count();
-                }
-            @endphp
-            {{ $publishedCourses }}
-          </h3>
-          <small>Active courses</small>
-        </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="stat-card p-3 rounded">
-          <h6 class="text-muted">Total Students</h6>
-          <h3 class="text-info">0</h3>
-          <small>Enrolled students</small>
-        </div>
-      </div>
-      <div class="col-md-3 mb-3">
-        <div class="stat-card p-3 rounded">
-          <h6 class="text-muted">Created</h6>
-          <h5 class="text-secondary">
-            {{ $category->created_at->format('M d, Y') }}
-          </h5>
-          <small>Creation date</small>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+    <table class="table table-sm">
+      @foreach($category->courses()->latest()->take(5)->get() as $course)
+      <tr>
+        <td>{{ $course->title }}</td>
+        <td>
+          <a href="{{ url('courses/' . $course->id) }}" class="btn btn-view btn-sm">
+            <i class="fas fa-eye"></i>
+          </a>
+        </td>
+      </tr>
+      @endforeach
+    </table>
 
-<!-- Recent Courses in This Category -->
-@php
-    // Safely check if category has courses
-    $hasCourses = false;
-    $recentCourses = collect([]);
-    $courseCount = 0;
-    
-    if (method_exists($category, 'courses')) {
-        $courseCount = $category->courses()->count();
-        $hasCourses = $courseCount > 0;
-        if ($hasCourses) {
-            $recentCourses = $category->courses()->latest()->take(5)->get();
-        }
-    }
-@endphp
-
-@if($hasCourses)
-<div class="card mt-4">
-  <div class="card-header">
-    <h5 class="card-title mb-0">
-      <i class="fas fa-graduation-cap"></i> Recent Courses in This Category
-    </h5>
-  </div>
-  <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-sm table-hover">
-        <thead>
-          <tr>
-            <th>Course</th>
-            <th>Instructor</th>
-            <th>Price</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          @foreach($recentCourses as $course)
-            <tr>
-              <td>
-                <strong>{{ $course->title }}</strong>
-                <br>
-                <small class="text-muted">{{ Str::limit($course->description, 30) }}</small>
-              </td>
-              <td>
-                @if($course->instructor)
-                  {{ $course->instructor->name }}
-                @endif
-              </td>
-              <td>
-                @if($course->price == 0)
-                  <span class="badge bg-success">Free</span>
-                @else
-                  ${{ number_format($course->price, 2) }}
-                @endif
-              </td>
-              <td>
-                @if($course->published)
-                  <span class="badge badge-published">Published</span>
-                @else
-                  <span class="badge badge-draft">Draft</span>
-                @endif
-              </td>
-              <td>
-                <a href="{{ url('courses/' . $course->id) }}" class="btn btn-view btn-sm">
-                  <i class="fas fa-eye"></i>
-                </a>
-              </td>
-            </tr>
-          @endforeach
-        </tbody>
-      </table>
-    </div>
-    @if($courseCount > 5)
-      <div class="text-center mt-3">
-        <a href="{{ url('courses?category=' . $category->slug) }}" class="btn btn-outline-primary btn-sm">
-          View All {{ $courseCount }} Courses
-        </a>
-      </div>
-    @endif
+    <a href="{{ url('courses?category=' . $category->slug) }}" class="btn btn-outline-primary btn-sm">
+      View All Courses
+    </a>
   </div>
 </div>
 @endif
+
 
 <style>
   .card {

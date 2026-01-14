@@ -57,8 +57,8 @@
                 <div class="stat-card bg-warning text-white p-3 rounded">
                     <h6 class="mb-1">Latest Added</h6>
                     <h5 class="mb-0">
-                        @if($categories->isNotEmpty() && $categories->first())
-                            {{ $categories->first()->created_at->diffForHumans() }}
+                        @if($latestCategory)
+                            {{ $latestCategory->created_at->diffForHumans() }}
                         @else
                             N/A
                         @endif
@@ -148,21 +148,20 @@
                             </td>
                             <td>
                                 <small class="text-muted">{{ $item->created_at->format('M d, Y') }}</small>
-                            </td>
                             <td>
                                 <div class="btn-group" role="group">
                                     <!-- View Button -->
-                                    <a href="{{ url('/categories/' . $item->id) }}" title="View Category" class="btn btn-view btn-sm">
+                                    <a href="{{ url('/categories/' . $item->slug) }}" title="View Category" class="btn btn-view btn-sm">
                                         <i class="fas fa-eye" aria-hidden="true"></i>
                                     </a>
 
                                     <!-- Edit Button -->
-                                    <a href="{{ url('/categories/' . $item->id . '/edit') }}" title="Edit Category" class="btn btn-edit btn-sm">
+                                    <a href="{{ url('/categories/' . $item->slug . '/edit') }}" title="Edit Category" class="btn btn-edit btn-sm">
                                         <i class="fas fa-edit" aria-hidden="true"></i>
                                     </a>
 
                                     <!-- Delete Button -->
-                                    <form method="POST" action="{{ url('/categories/' . $item->id) }}" accept-charset="UTF-8" style="display:inline">
+                                    <form method="POST" action="{{ url('/categories/' . $item->slug) }}" accept-charset="UTF-8" style="display:inline">
                                         @method('DELETE')
                                         @csrf
                                         <button type="submit" class="btn btn-delete btn-sm" title="Delete Category" 
