@@ -23,7 +23,8 @@
         <i class="fas fa-folder"></i> Category Details: {{ $category->name }}
       </h4>
       <div>
-        <a href="{{ url('/categories/' . $category->id . '/edit') }}" class="btn btn-edit">
+        <!-- Use slug with route() -->
+        <a href="{{ route('categories.edit', $category->slug) }}" class="btn btn-edit">
           <i class="fas fa-edit"></i> Edit
         </a>
       </div>
@@ -161,7 +162,8 @@
           </h5>
           
           <div class="d-grid gap-2">
-            <a href="{{ url('/courses/create?category_id=' . $category->id) }}" class="btn btn-outline-success">
+            <!-- Use route() helper for slug where needed -->
+            <a href="{{ route('courses.create', ['category_id' => $category->id]) }}" class="btn btn-outline-success">
               <i class="fas fa-plus-circle"></i> Add Course to Category
             </a>
             <a href="{{ url('/courses?category=' . $category->slug) }}" class="btn btn-outline-primary">
@@ -235,7 +237,7 @@
                       @endif
                     </td>
                     <td>
-                      <a href="{{ url('/courses/' . $course->id) }}" class="btn btn-view btn-sm">
+                      <a href="{{ route('courses.show', $course->id) }}" class="btn btn-view btn-sm">
                         <i class="fas fa-eye"></i>
                       </a>
                     </td>
@@ -254,7 +256,7 @@
           <i class="fas fa-graduation-cap fa-3x text-muted mb-3"></i>
           <h5 class="text-muted">No Courses in This Category</h5>
           <p class="text-muted mb-4">This category doesn't have any courses yet.</p>
-          <a href="{{ url('/courses/create?category_id=' . $category->id) }}" class="btn btn-success">
+          <a href="{{ route('courses.create', ['category_id' => $category->id]) }}" class="btn btn-success">
             <i class="fas fa-plus-circle"></i> Create First Course
           </a>
         </div>
@@ -284,6 +286,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- JavaScript Function for Print -->
 <script>
